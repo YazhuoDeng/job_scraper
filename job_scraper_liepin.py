@@ -1,68 +1,85 @@
-
-
-
 import time
 import urllib
 import requests
 from bs4 import BeautifulSoup
 import selenium
 from selenium import webdriver
+from selenium.webdriver.common.action_chains import ActionChains #place the cursor to the element
 from selenium.webdriver.support.ui import WebDriverWait
 import pandas as pd
 import os
 
 
-def find_jobs_from(website, job_title, location, desired_characs):    
+def find_jobs_from(job_title, location, pubtime, desired_characs):    
     """
     This function extracts all the desired characteristics of all new job postings
-    of the title and location specified and returns them in single file.
+    of the title, location and pubtime specified and returns them in single file.
     The arguments it takes are:
-        - Website: to specify which website to search
         - Job_title, which can be key words as well
         - Location, type the country name if search for the whole country
-        - Desired_characs: this is a list of the job characteristics of interest,
+        - pubtime, published date
+        - Desired_characs, this is a list of the job characteristics of interest,
             from titles, companies, links and date_listed.
-    """
-    
-    #can be used for other websites
-    if website == 'Liepin':
-        driver = webdriver.Chrome(executable_path=('/usr/local/bin/chromedriver'))        
-        job_soup = make_job_search_liepin(job_title, location, driver)
-        jobs_list, num_listings = extract_job_information_liepin(job_soup, desired_characs)
-    
-    jobs = pd.DataFrame(jobs_list)
-    filetime = time.strftime('%Y%m%d')
-    filename ='{}_{}_{}.xls'.format(website, location, filetime)
-    jobs.to_excel(filename)
- 
-    print('{} new job postings retrieved from {}. Stored in {}.'.format(num_listings, website, filename))
+    """   
 
-
-def make_job_search_liepin(job_title, location, driver):
+    driver = webdriver.Chrome(executable_path=('/usr/local/bin/chromedriver'))  
     driver.get('https://www.liepin.com/')
-    
     # Select the job box
     job_title_box = driver.find_element_by_xpath("//*[@name='key']")
     job_title_box.clear()
-    
+
     # Send job information
     job_title_box.send_keys(job_title)
-    
+
     # Find Search button
     search_button = driver.find_element_by_xpath("//*[@class='search-btn float-right']")
     search_button.click()
-    
+
     # Find city button
     location_button = driver.find_element_by_xpath("//*[text()= \'{}\']".format(location))
     location_button.click()
-    
-    driver.implicitly_wait(5)
 
-    page_source = driver.page_source
+    # limit job within 3 days
+    # place cursor to the dropdown for visibility
+    dropdown_time = driver.find_element_by_xpath("//*[@class='dropdown dropdown-time']") 
+    webdriver.ActionChains(driver).move_to_element(dropdown_time).perform() 
+
+    # click the pub time
+    pub_time_button = driver.find_element_by_xpath("//*[text()= \'{}\']".format(pubtime))
+    pub_time_button.click()
+
+    driver.implicitly_wait(5)
     
-    job_soup = BeautifulSoup(page_source, "html.parser")
+    page = 1
+    all_jobs = pd.DataFrame() 
+
+    while page < 11: # pick an arbitrary number of pages so this doesn't run infinitely
+        print(f'\nNEXT PAGE #: {page}\n')        
+
+        page_source = driver.page_source
+        job_soup = BeautifulSoup(page_source, 'html.parser')
+        jobs_list, num_listings = extract_job_information_liepin(job_soup, desired_characs) 
+        jobs_list = pd.DataFrame(jobs_list)
+        all_jobs= pd.concat([all_jobs,jobs_list])
+
+        #scroll down to the bottom of the page
+        page_bar = driver.find_element_by_xpath("//*[@class='commonweblink-main wrap']") 
+        webdriver.ActionChains(driver).move_to_element(page_bar).perform()
+        #click next page
+        next_page_button = driver.find_element_by_xpath("//*[text() = '下一页']")
+        next_page_button.click()
+        
+        page += 1 # increment page count
+        
+        driver.implicitly_wait(5)       
     
-    return job_soup
+    #store jobs in an excel file
+    filetime = time.strftime('%Y%m%d')
+    filename ='{}_{}.xls'.format(location, filetime)
+    all_jobs.to_excel(filename)
+    driver.close() #close the browser window
+ 
+    print('{} new job postings in {}. Stored in {}.'.format(num_listings, location, filename))
 
 
 def extract_job_information_liepin(job_soup, desired_characs):
@@ -134,18 +151,18 @@ def extract_area_liepin(job_elem):
     return area
 
 def extract_link_liepin(job_elem):
-    link = job_elem.find('a')['href']
+    link = job_elem.find('a')['href']   
+    # if there is no lie pin prefex, add that
+    if link[0] == '/':
+        link = f"https://www.liepin.com{link}"
     return link
 
 def extract_date_liepin(job_elem):
     date = job_elem.find('time')['title']
     return date
 
+
 #example 
 
 desired_characs = ['titles', 'companies', 'links', 'date_listed']
-find_jobs_from('Liepin', '统计', '深圳', desired_characs)
-
-
-
-
+find_jobs_from( '统计', '深圳', '三天以内', desired_characs)
