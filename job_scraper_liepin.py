@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import selenium
 from selenium import webdriver
-from selenium.webdriver.common.action_chains import ActionChains #place the cursor to the element
+from selenium.webdriver.common.action_chains import ActionChains 
 from selenium.webdriver.support.ui import WebDriverWait
 import pandas as pd
 import os
