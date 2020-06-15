@@ -154,19 +154,19 @@ def extract_company_indeed(job_elem):
 def extract_link_indeed(job_elem, country):
     link = job_elem.find('a')['href']
     if country == 'united_states':
-        link = 'http://www.Indeed.com/' + link
+        link = 'http://www.Indeed.com' + link
     if country == 'malaysia':
-        link = 'http://malaysia.Indeed.com/' + link
+        link = 'http://malaysia.Indeed.com' + link
     if country == 'singapore':
-        link = 'http://sg.Indeed.com/' + link
+        link = 'http://sg.Indeed.com' + link
     if country == 'canada':
-        link = 'http://ca.Indeed.com/' + link
+        link = 'http://ca.Indeed.com' + link
     if country == 'united_kingdom':
-        link = 'http://www.Indeed.co.uk/' + link
+        link = 'http://www.Indeed.co.uk' + link
     if country == 'australia':
-        link = 'http://au.Indeed.com/' + link
+        link = 'http://au.Indeed.com' + link
     if country == 'china':
-        link = 'http://cn.Indeed.com/' + link
+        link = 'http://cn.Indeed.com' + link
     return link
 
 def extract_date_indeed(job_elem):
