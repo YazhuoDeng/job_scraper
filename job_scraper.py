@@ -5,16 +5,16 @@ from bs4 import BeautifulSoup
 import selenium
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import pandas as pd
 import os
 
 
-def find_jobs_from(website, job_title, location, country, desired_characs):    
+def find_jobs_from( job_title, location, country, desired_characs):    
     """
     This function extracts all the desired characteristics of all new job postings
     of the title and location specified and returns them in single file.
     The arguments it takes are:
-        - Website: to specify which website to search (options: 'Indeed' or 'CWjobs')
         - Job_title, which can be key words as well
         - Location, type the country name if search for the whole country
         - country
@@ -23,31 +23,9 @@ def find_jobs_from(website, job_title, location, country, desired_characs):
             
     """
     
-    if website == 'Indeed':
-        job_soup = load_indeed_jobs_div(job_title, location, country)
-        jobs_list, num_listings = extract_job_information_indeed(job_soup, desired_characs, country)
-    
-    #can be used for other websites
-    if website == 'CWjobs':
-        location_of_driver = os.getcwd()
-        driver = initiate_driver(location_of_driver, browser='chrome')
-        job_soup = make_job_search(job_title, location, driver)
-        jobs_list, num_listings = extract_job_information_cwjobs(job_soup, desired_characs)
-    
-    jobs = pd.DataFrame(jobs_list)
-    filetime = time.strftime('%Y%m%d')
-    filename ='{}_{}_{}_{}.xls'.format(website, location, country, filetime)
-    jobs.to_excel(filename)
- 
-    print('{} new job postings retrieved from {}. Stored in {}.'.format(num_listings, website, filename))
-
-
-
-
-## ================== FUNCTIONS FOR INDEED.COM =================== ##
-
-def load_indeed_jobs_div(job_title, location, country):
     getVars = {'q' : job_title, 'l' : location, 'fromage' : 'last', 'sort' : 'date'}
+    
+    #define country domain for url
     if country == 'united_states':
         url = ('https://www.indeed.com/jobs?' + urllib.parse.urlencode(getVars))        
     if country == "malaysia": 
@@ -62,10 +40,61 @@ def load_indeed_jobs_div(job_title, location, country):
         url = ('https://au.indeed.com/jobs?' + urllib.parse.urlencode(getVars))
     if country == "china": 
         url = ('https://cn.indeed.com/jobs?' + urllib.parse.urlencode(getVars))
-    page = requests.get(url)
-    soup = BeautifulSoup(page.content, "html.parser")
-    job_soup = soup.find(id="resultsCol")
-    return job_soup
+    
+    #load chrome
+    driver = webdriver.Chrome(executable_path=('/usr/local/bin/chromedriver'))  
+    driver.get(url)
+    
+    page = 1
+    all_jobs = pd.DataFrame() 
+    total_num_listings = 0
+
+    while page < 10: # pick an arbitrary number of pages so this doesn't run infinitely
+        print(f'\nNEXT PAGE #: {page}\n')    
+        
+        #extract job info and put them into a data frame
+        page_source = driver.page_source
+        job_soup = BeautifulSoup(page_source, 'html.parser')
+        jobs_list, num_listings = extract_job_information_indeed(job_soup, desired_characs, country) 
+        jobs_list = pd.DataFrame(jobs_list)
+        all_jobs= pd.concat([all_jobs,jobs_list])
+        total_num_listings += num_listings
+        page += 1 # increment page count
+
+        
+        # close a random popup if it shows up
+        try:
+            driver.find_element_by_xpath("//*[@id='popover-x']").click()
+        except NoSuchElementException:
+            pass
+        
+        #click next page
+        try:
+            #scroll down to the bottom of the page
+            page_bar = driver.find_element_by_xpath("//*[@class='pagination-list']") 
+            webdriver.ActionChains(driver).move_to_element(page_bar).perform()
+            #click next page button
+            next_page_button = driver.find_element_by_xpath("//*[@aria-label = 'Next']")
+            next_page_button.click()
+        except NoSuchElementException:
+            break
+        
+        driver.implicitly_wait(5)  
+    
+    #close chrome
+    driver.close()
+    #store jobs in an excel file
+    filetime = time.strftime('%Y%m%d')
+    filename ='{}_{}_{}.xls'.format(location, country, filetime)
+    all_jobs.to_excel(filename)
+ 
+    print('{} new job postings in {}. Stored in {}.'.format(total_num_listings, location, filename))
+
+
+
+
+## ================== FUNCTIONS FOR INDEED.COM =================== ##
+
 
 def extract_job_information_indeed(job_soup, desired_characs, country):
     job_elems = job_soup.find_all('div', class_='jobsearch-SerpJobCard')
@@ -146,14 +175,17 @@ def extract_date_indeed(job_elem):
     return date
 
 
+
+
+
 #try few examples
 
 desired_characs = ['titles', 'companies', 'links', 'date_listed']
 
-find_jobs_from('Indeed', 'statistics longitudinal', 'california', 'united_states', desired_characs)
+find_jobs_from('statistics longitudinal', 'california', 'united_states', desired_characs)
 
-find_jobs_from('Indeed', 'statistics', 'hawaii', 'united_states', desired_characs)
+find_jobs_from('statistics', 'hawaii', 'united_states', desired_characs)
 
-find_jobs_from('Indeed', 'statistics', 'florida', 'united_states', desired_characs)
+find_jobs_from('statistics', 'florida', 'united_states', desired_characs)
 
-find_jobs_from('Indeed', 'statistics', 'singapore', 'singapore', desired_characs)
+find_jobs_from('statistics', 'singapore', 'singapore', desired_characs)
