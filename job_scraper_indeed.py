@@ -70,6 +70,11 @@ def find_jobs_from( job_title, location, country, desired_characs):
         except NoSuchElementException:
             pass
         
+        try:
+            driver.find_element_by_xpath("//*[@class='tos-Button tos-Button-white']").click()
+        except NoSuchElementException:
+            pass
+        
         #click next page
         try:
             #scroll down to the bottom of the page
